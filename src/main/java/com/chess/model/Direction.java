@@ -43,17 +43,6 @@ public enum Direction {
             {0, -2}, // First move double step
             {-1, -1}, // Capture left
             {1, -1} // Capture right
-    }),
-
-    ALL(new int[][] {
-            {1, 1},   // Haut-droite
-            {1, -1},  // Haut-gauche
-            {-1, 1},  // Bas-droite
-            {-1, -1}, // Bas-gauche
-            {0, 1},   // Droite
-            {0, -1},  // Gauche
-            {1, 0},   // Haut
-            {-1, 0}   // Bas
     });
 
 

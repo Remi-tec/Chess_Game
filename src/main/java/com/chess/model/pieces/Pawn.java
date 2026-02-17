@@ -11,14 +11,14 @@ import java.util.List;
 public class Pawn extends Piece {
 
     public Pawn(Couleur color, Case position) {
-        super(color, position, color == Couleur.BLACK ? Direction.BLACKPAWN : Direction.WHITEPAWN);
+        super(color, position,Arrays.asList(color == Couleur.BLACK ? Direction.BLACKPAWN : Direction.WHITEPAWN),1);
     }
 
     @Override
     public Case[] getPossibleMoves(Piece[][] board) {
         System.out.println("Hasmove: " + hasMove);
         List<Case> possibleMoves = new ArrayList<>();
-        int[][] directions = this.typeOfMouvement.getDirections();
+        int[][] directions = getMergeTypeOfMouvement(typeOfMouvement);
 
         for (int[] direction : directions) {
             int newRow = position.getRows() + direction[0];

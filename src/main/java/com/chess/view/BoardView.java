@@ -120,6 +120,10 @@ public class BoardView extends GridPane {
             } //Reset de la sélection et des mouvements possibles
         }
         if (tabPossibleMoves != null) {
+            for (Case possibleMovetemp : tabPossibleMoves) {
+                System.out.print(" : " + possibleMovetemp);
+            }
+            System.out.println(": sss ");
             List<Case> tempList = new ArrayList<>();
             for (Case possibleMove : tabPossibleMoves) {
                 if(board.moveSimulation(caseSelected, possibleMove)){

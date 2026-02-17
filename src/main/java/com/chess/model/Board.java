@@ -2,6 +2,9 @@ package com.chess.model;
 
 import com.chess.model.pieces.*;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class Board {
     private Piece[][] board;
     private Couleur currentPlayer;
@@ -93,68 +96,54 @@ public class Board {
         if (boardCopy == null) return false;
         Case kingPosition = findKingPosition();
         if (kingPosition == null) return false;
+        List<Direction> directionList = Arrays.stream(Direction.values()).limit(3).toList();
+        boolean move;
 
+        for (Direction directionType : directionList) {
+            int newRow;
+            int newCol;
+            int range;
+            int[][] directions = directionType.getDirections();
+            for (int[] direction : directions) {
+                newRow = kingPosition.getRows();
+                newCol = kingPosition.getColumns();
+                move = true;
+                range = 0;
+                while (move) {
+                    range++;
+                    newRow += direction[0];
+                    newCol += direction[1];
+                    if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                        if (boardCopy[newRow][newCol] == null) {
+                            continue;
+                        }
+                        else if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
+                                && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType)  && range <= boardCopy[newRow][newCol].getMoveRange()) {
+                            System.out.println("Check par " + boardCopy[newRow][newCol].getNom() + " en " + newRow + "," + newCol);
+                            return true;
+                        } else {
+                            move = false;
+                        }
+                    } else {
+                        move = false;
+                    }
+                }
+            }
+        }
+
+        // Pawn attacks
+        int[][] directions;
         int newRow;
         int newCol;
-        int[][] directions = Direction.DIAGONAL.getDirections(); // Bishop and Queen moves
-        boolean move;
-        for (int[] direction : directions) {
-            newRow = kingPosition.getRows();
-            newCol = kingPosition.getColumns();
-            move = true;
-            while (move) {
-                newRow += direction[0];
-                newCol += direction[1];
-                if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
-                    if (boardCopy[newRow][newCol] == null) {
-                        continue;
-                    }
-                    if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
-                            && (boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.DIAGONAL
-                            || boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.ALL)) {
-                        return true;
-                    } else {
-                        move = false;
-                    }
-                } else {
-                    move = false;
-                }
-            }
-        }
-
-        directions = Direction.HORIZONTAL.getDirections(); // Rook and Queen moves
-        for (int[] direction : directions) {
-            newRow = kingPosition.getRows();
-            newCol = kingPosition.getColumns();
-            move = true;
-            while (move) {
-                newRow += direction[0];
-                newCol += direction[1];
-                if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
-                    if (boardCopy[newRow][newCol] == null) {
-                        continue;
-                    }
-                    if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
-                            && (boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.HORIZONTAL
-                            || boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.ALL)) {
-                        return true;
-                    } else {
-                        move = false;
-                    }
-                } else {
-                    move = false;
-                }
-            }
-        }
-
-        directions = Direction.L.getDirections(); // Knight moves
+        directions = this.getCurrentPlayer() == Couleur.WHITE ? Direction.WHITEPAWN.getDirections() : Direction.BLACKPAWN.getDirections();
+        directions = new int[][] {directions[2], directions[3]}; // Only diagonal attacks
         for (int[] direction : directions) {
             newRow = kingPosition.getRows() + direction[0];
             newCol = kingPosition.getColumns() + direction[1];
             if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
                 if (boardCopy[newRow][newCol] != null
                         && boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
-                        && boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.L) {
+                        && boardCopy[newRow][newCol].getTypeOfMouvement().contains((this.getCurrentPlayer() == Couleur.WHITE ? Direction.BLACKPAWN : Direction.WHITEPAWN))) {
                     return true;
                 }
             }
