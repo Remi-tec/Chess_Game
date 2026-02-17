@@ -39,3 +39,10 @@ Notation des coups joués : https://ecole.apprendre-les-echecs.com/notation-part
 
 Image Chess.com : "C:\Users\Rémi\Pictures\Screenshots\Capture d'écran 2026-02-16 171520.png"
 
+
+Logique échec du roi a chaque selection de Piece :
+ → getPossibleMoves()
+    → Pour chaque coup :
+        → Copier le plateau (64 opérations)
+        → Simuler le coup
+        → isInCheck() (parcourir directions)

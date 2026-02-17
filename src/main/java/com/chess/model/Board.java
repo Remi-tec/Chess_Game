@@ -5,6 +5,7 @@ import com.chess.model.pieces.*;
 public class Board {
     private Piece[][] board;
     private Couleur currentPlayer;
+    private Piece[][] boardCopy;
 
     public Board(){
         board = new Piece[8][8];
@@ -75,6 +76,111 @@ public class Board {
         return true;
     }
 
+    private Case findKingPosition() {
+        if (boardCopy == null) return null;
+        for (int i = 0; i < boardCopy.length ; i++ ){
+            for (int j = 0; j < boardCopy[i].length; j++){
+                Piece piece = boardCopy[i][j];
+                if (piece instanceof King && piece.getColor() == this.getCurrentPlayer()) {
+                    return new Case(i,j);
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isInCheck() {
+        if (boardCopy == null) return false;
+        Case kingPosition = findKingPosition();
+        if (kingPosition == null) return false;
+
+        int newRow;
+        int newCol;
+        int[][] directions = Direction.DIAGONAL.getDirections(); // Bishop and Queen moves
+        boolean move;
+        for (int[] direction : directions) {
+            newRow = kingPosition.getRows();
+            newCol = kingPosition.getColumns();
+            move = true;
+            while (move) {
+                newRow += direction[0];
+                newCol += direction[1];
+                if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                    if (boardCopy[newRow][newCol] == null) {
+                        continue;
+                    }
+                    if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
+                            && (boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.DIAGONAL
+                            || boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.ALL)) {
+                        return true;
+                    } else {
+                        move = false;
+                    }
+                } else {
+                    move = false;
+                }
+            }
+        }
+
+        directions = Direction.HORIZONTAL.getDirections(); // Rook and Queen moves
+        for (int[] direction : directions) {
+            newRow = kingPosition.getRows();
+            newCol = kingPosition.getColumns();
+            move = true;
+            while (move) {
+                newRow += direction[0];
+                newCol += direction[1];
+                if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                    if (boardCopy[newRow][newCol] == null) {
+                        continue;
+                    }
+                    if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
+                            && (boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.HORIZONTAL
+                            || boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.ALL)) {
+                        return true;
+                    } else {
+                        move = false;
+                    }
+                } else {
+                    move = false;
+                }
+            }
+        }
+
+        directions = Direction.L.getDirections(); // Knight moves
+        for (int[] direction : directions) {
+            newRow = kingPosition.getRows() + direction[0];
+            newCol = kingPosition.getColumns() + direction[1];
+            if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                if (boardCopy[newRow][newCol] != null
+                        && boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
+                        && boardCopy[newRow][newCol].getTypeOfMouvement() == Direction.L) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean moveSimulation(Case start,Case destination) {
+        boardCopy = new Piece[8][8];
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[i].length; j++) {
+                if (board[i][j] != null) {
+                    boardCopy[i][j] = board[i][j];
+                }
+            }
+        }
+
+        Piece piece = boardCopy[start.getRows()][start.getColumns()];
+        if (piece == null) return false;
+
+        boardCopy[destination.getRows()][destination.getColumns()] = piece;
+        boardCopy[start.getRows()][start.getColumns()] = null;
+
+        return !isInCheck();
+    }
+
     public Couleur getCurrentPlayer() {
         return currentPlayer;
     }
@@ -83,4 +189,3 @@ public class Board {
         return board;
     }
 }
-
