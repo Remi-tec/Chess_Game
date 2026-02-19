@@ -31,16 +31,16 @@ public enum Direction {
 
     WHITEPAWN(new int[][] {
             // Blancs
-            {0, 1}, // Move forward
             {0, 2}, // First move double step
+            {0, 1}, // Move forward
             {1, 1}, // Capture left
             {-1, 1}
     }),
 
     BLACKPAWN(new int[][] {
             // Noirs
-            {0, -1}, // Move forward
             {0, -2}, // First move double step
+            {0, -1}, // Move forward
             {-1, -1}, // Capture left
             {1, -1} // Capture right
     });

@@ -18,7 +18,7 @@ public class BoardView extends GridPane {
     private static final int CASE_SIZE = 75;
     private Board board;
     private Case caseSelected = null;
-    private Case[] tabPossibleMoves = null;
+    private List<Case> tabPossibleMoves = null;
 
     public BoardView(Board board) {
         this.board = board;
@@ -96,7 +96,7 @@ public class BoardView extends GridPane {
 
             if (piece != null && piece.getColor() == board.getCurrentPlayer()) {
                 caseSelected = new Case(row, column);
-                tabPossibleMoves = piece.getPossibleMoves(board.getBoard());
+                tabPossibleMoves = board.getPossibleMovesCache().get(piece);
                 System.out.println("Pièce sélectionnée : " + piece.getNom() + " en " + caseSelected); //Piece sélectionnée
             }
         } else {
@@ -104,7 +104,7 @@ public class BoardView extends GridPane {
             Piece piece = board.getPiece(row, column);
             if (piece != null && board.getPiece(caseDestination).getColor() == board.getCurrentPlayer()) {
                 caseSelected = caseDestination;
-                tabPossibleMoves = piece.getPossibleMoves(board.getBoard());
+                tabPossibleMoves = board.getPossibleMovesCache().get(piece);
                 System.out.println("Pièce sélectionnée : " + piece.getNom() + " en " + caseSelected); //Piece sélectionnée
             } else {
 
@@ -112,6 +112,7 @@ public class BoardView extends GridPane {
 
                 if (moveSucceded) {
                     System.out.println("Déplacement réussi de " + caseSelected + " à " + caseDestination);
+                    board.updatePossibleMovesCache(caseSelected,caseDestination);
                 } else {
                     System.out.println("Déplacement impossible");
                 }
@@ -120,26 +121,13 @@ public class BoardView extends GridPane {
             } //Reset de la sélection et des mouvements possibles
         }
         if (tabPossibleMoves != null) {
-            for (Case possibleMovetemp : tabPossibleMoves) {
+            for (Case possibleMovetemp : tabPossibleMoves) { //Affichage des mouvements possibles dans la console
                 System.out.print(" : " + possibleMovetemp);
             }
-            System.out.println(": sss ");
-            List<Case> tempList = new ArrayList<>();
-            for (Case possibleMove : tabPossibleMoves) {
-                if(board.moveSimulation(caseSelected, possibleMove)){
-                    tempList.add(possibleMove);
-                };
-            }
-            tabPossibleMoves = tempList.toArray(new Case[0]);
-            System.out.print("Mouvements possibles :");
-            for (Case possibleMove : tabPossibleMoves) {
-                System.out.print(" : " + possibleMove);
-            }
-            System.out.println("");
         }
         refreshBoard();
     }
-
+    // Vérifie si la case cliquée est dans les mouvements possibles
     private boolean isPossibleMove(int row, int col) {
         if (tabPossibleMoves == null) return false;
         for (Case c : tabPossibleMoves) {

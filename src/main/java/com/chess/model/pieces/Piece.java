@@ -50,7 +50,7 @@ public abstract class Piece {
         this.moveCount++;
     }
 
-    public  boolean canMove(Case destination, Piece[][] board, Case[] tabPossibleMoves) {
+    public  boolean canMove(Case destination, Piece[][] board, List<Case> tabPossibleMoves) {
         for (Case possibleMoves : tabPossibleMoves) {
             if (possibleMoves != null && possibleMoves.getRows() == destination.getRows() && possibleMoves.getColumns() == destination.getColumns()) {
                 return true;
@@ -93,8 +93,10 @@ public abstract class Piece {
 
         return possibleMoves.toArray(new Case[0]);
     }
+
     public  int getMoveRange(){
         return moveRange;
     }
+
     public abstract String getNom();
 }

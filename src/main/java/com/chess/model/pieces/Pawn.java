@@ -16,7 +16,6 @@ public class Pawn extends Piece {
 
     @Override
     public Case[] getPossibleMoves(Piece[][] board) {
-        System.out.println("Hasmove: " + hasMove);
         List<Case> possibleMoves = new ArrayList<>();
         int[][] directions = getMergeTypeOfMouvement(typeOfMouvement);
 
