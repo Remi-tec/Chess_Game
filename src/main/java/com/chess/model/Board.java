@@ -13,12 +13,14 @@ public class Board {
     private Piece[][] board;
     private Couleur currentPlayer;
     private Piece[][] boardCopy;
+    private List<Piece> kingsList;
     private Map<Piece, List<Case>> possibleMovesCache;
 
     public Board() {
         board = new Piece[8][8];
         currentPlayer = Couleur.WHITE;
         initializeBoard();
+        initializeKingsList();
         initializePossibleMovesCache();
     }
 
@@ -67,6 +69,18 @@ public class Board {
             }
         }
         System.out.println("Cache des mouvements possibles initialisé.");
+    }
+
+    private void initializeKingsList() {
+        kingsList = new ArrayList<>();
+        for (int i = 0; i < board.length; i++) {
+            for (int j = 0; j < board[i].length; j++) {
+                Piece piece = board[i][j];
+                if (piece instanceof King) {
+                    kingsList.add(piece);
+                }
+            }
+        }
     }
 
     private List<Piece> piecesToUpdateDetection(Case position) {
@@ -121,46 +135,48 @@ public class Board {
         return piecesToUpdate;
     }
 
-    private List<Piece> wallPieceDetection(Case position) {
+    private List<Piece> wallPieceDetection(Case finish) {
         List<Piece> pinned = new ArrayList<>();
-        Piece from = getPiece(position);
-        if (from == null) return pinned;
+        Piece from = kingsList.stream().filter(king -> king.getColor() == currentPlayer).findFirst().orElse(null);
 
         // Ne garder que les directions "rayons" (pas de L)
-        int[][] directions = from.getTypeOfMouvement().stream()
-                .filter(dir -> dir == Direction.DIAGONAL || dir == Direction.HORIZONTAL)
-                .flatMap(dir -> Arrays.stream(dir.getDirections()))
-                .toArray(int[][]::new);
+        for (Direction dir : Arrays.asList(Direction.DIAGONAL, Direction.HORIZONTAL)) {
+            for (int[] direction : dir.getDirections()) {
+                int newRow = finish.getRows();
+                int newCol = finish.getColumns();
+                Piece firstEnemy = null;
+                Piece brotherCount = null;
 
-        for (int[] direction : directions) {
-            int newRow = position.getRows();
-            int newCol = position.getColumns();
-            Piece firstEnemy = null;
+                while (true) {
+                    newRow += direction[0];
+                    newCol += direction[1];
 
-            while (true) {
-                newRow += direction[0];
-                newCol += direction[1];
+                    if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) break;
 
-                if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) break;
+                    Piece target = board[newRow][newCol];
+                    if (target == null) continue;
 
-                Piece target = board[newRow][newCol];
-                if (target == null) continue;
-
-                if (target.getColor() == from.getColor()) {
-                    break; // bloqué par une pièce alliée
-                }
-
-                if (target instanceof King) {
-                    if (firstEnemy != null) {
-                        pinned.add(firstEnemy);
+                    if (target.getColor() == from.getColor()) {
+                        brotherCount = target; // une pièce alliée entre le roi et la pièce potentiellement clouée
+                    }else {
+                        if(target.getTypeOfMouvement().contains(dir) && brotherCount != null) {
+                            pinned.add(brotherCount);
+                            break;// une pièce ennemie avant le roi => pas de clouage
+                        }
                     }
-                    break; // roi trouvé, on arrête dans cette direction
-                }
 
-                if (firstEnemy == null) {
-                    firstEnemy = target; // première pièce ennemie potentiellement clouée
-                } else {
-                    break; // une deuxième pièce ennemie => pas de clouage
+                    if (target instanceof King) {
+                        if (firstEnemy != null) {
+                            pinned.add(firstEnemy);
+                        }
+                        break; // roi trouvé, on arrête dans cette direction
+                    }
+
+                    if (firstEnemy == null) {
+                        firstEnemy = target; // première pièce ennemie potentiellement clouée
+                    } else {
+                        break; // une deuxième pièce ennemie => pas de clouage
+                    }
                 }
             }
         }
@@ -171,6 +187,9 @@ public class Board {
         List<Piece> listPiecesStart = piecesToUpdateDetection(start);
         listPiecesStart.add(getPiece(finish));
         List<Piece> listWall = wallPieceDetection(finish);
+        if (getPiece(finish) instanceof King) {
+            listWall.addAll(wallPieceDetection(start));
+        }
         List<Piece> listPiecesFinish = piecesToUpdateDetection(finish);
 
         List<Piece> merged = Stream.concat(listPiecesStart.stream(), listPiecesFinish.stream())
@@ -242,7 +261,7 @@ public class Board {
             for (int j = 0; j < boardCopy[i].length; j++) {
                 Piece piece = boardCopy[i][j];
                 if (piece instanceof King && piece.getColor() == this.getCurrentPlayer()) {
-                    return new Case(i, j);
+                    return piece.getPosition();
                 }
             }
         }
