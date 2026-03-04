@@ -1,6 +1,7 @@
 package com.chess.model;
 
 import com.chess.model.pieces.*;
+import javafx.scene.paint.Color;
 
 import java.util.Arrays;
 import java.util.List;
@@ -15,6 +16,8 @@ public class Board {
     private Piece[][] boardCopy;
     private List<Piece> kingsList;
     private Map<Piece, List<Case>> possibleMovesCache;
+    private Map<Piece,List<Case>> possibleMovesCacheEchec;
+    private boolean isInCheck;
 
     public Board() {
         board = new Piece[8][8];
@@ -53,6 +56,7 @@ public class Board {
 
     private void initializePossibleMovesCache() {
         possibleMovesCache = new java.util.HashMap<>();
+        possibleMovesCacheEchec = new java.util.HashMap<>();
         for (int i = 0; i < board.length; i++) {
             for (int j = 0; j < board[i].length; j++) {
                 Piece piece = board[i][j];
@@ -85,9 +89,8 @@ public class Board {
 
     private List<Piece> piecesToUpdateDetection(Case position) {
         List<Piece> piecesToUpdate = new ArrayList<>();
-        List<Direction> directionList = Arrays.stream(Direction.values()).limit(3).toList();
         boolean move;
-        for (Direction directionType : directionList) {
+        for (Direction directionType : Arrays.stream(Direction.values()).limit(3).toList()) {
             int newRow;
             int newCol;
             int range;
@@ -115,18 +118,32 @@ public class Board {
                 }
             }
         }
-        int[][] directions;
+        // Détection des pions blancs et noirs affectés
         int newRow;
         int newCol;
-        directions = this.getCurrentPlayer() == Couleur.WHITE ? Direction.WHITEPAWN.getDirections() : Direction.BLACKPAWN.getDirections();
-        for (int i = 0; i < directions.length; i++) {
-            newRow = position.getRows() + directions[i][0];
-            newCol = position.getColumns() + directions[i][1];
+        int[][] whitePawnDirections = Direction.WHITEPAWN.getDirections();
+        for (int i = 0; i < whitePawnDirections.length; i++) {
+            newRow = position.getRows() + whitePawnDirections[i][0];
+            newCol = position.getColumns() + whitePawnDirections[i][1];
             if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
                 if (board[newRow][newCol] != null
-                        && board[newRow][newCol].getTypeOfMouvement().contains((this.getCurrentPlayer() == Couleur.WHITE ? Direction.BLACKPAWN : Direction.WHITEPAWN ))) {
+                        && board[newRow][newCol].getTypeOfMouvement().contains(Direction.BLACKPAWN)) {
                     if (i == 0 && board[newRow][newCol].getHasMove()) {
-                    }else {
+                    } else {
+                        piecesToUpdate.add(board[newRow][newCol]);
+                    }
+                }
+            }
+        }
+        int[][] blackPawnDirections = Direction.BLACKPAWN.getDirections();
+        for (int i = 0; i < blackPawnDirections.length; i++) {
+            newRow = position.getRows() + blackPawnDirections[i][0];
+            newCol = position.getColumns() + blackPawnDirections[i][1];
+            if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                if (board[newRow][newCol] != null
+                        && board[newRow][newCol].getTypeOfMouvement().contains(Direction.WHITEPAWN)) {
+                    if (i == 0 && board[newRow][newCol].getHasMove()) {
+                    } else {
                         piecesToUpdate.add(board[newRow][newCol]);
                     }
                 }
@@ -135,9 +152,8 @@ public class Board {
         return piecesToUpdate;
     }
 
-    private List<Piece> wallPieceDetection(Case finish) {
+    private List<Piece> wallPieceDetection(Case finish, Couleur color) {
         List<Piece> pinned = new ArrayList<>();
-        Piece from = kingsList.stream().filter(king -> king.getColor() == currentPlayer).findFirst().orElse(null);
 
         // Ne garder que les directions "rayons" (pas de L)
         for (Direction dir : Arrays.asList(Direction.DIAGONAL, Direction.HORIZONTAL)) {
@@ -156,7 +172,7 @@ public class Board {
                     Piece target = board[newRow][newCol];
                     if (target == null) continue;
 
-                    if (target.getColor() == from.getColor()) {
+                    if (target.getColor() == color) {
                         brotherCount = target; // une pièce alliée entre le roi et la pièce potentiellement clouée
                     }else {
                         if(target.getTypeOfMouvement().contains(dir) && brotherCount != null) {
@@ -186,9 +202,11 @@ public class Board {
     public void updatePossibleMovesCache(Case start,Case finish) {
         List<Piece> listPiecesStart = piecesToUpdateDetection(start);
         listPiecesStart.add(getPiece(finish));
-        List<Piece> listWall = wallPieceDetection(finish);
-        if (getPiece(finish) instanceof King) {
-            listWall.addAll(wallPieceDetection(start));
+        List<Piece> listWall = wallPieceDetection(findKingPosition(board), getCurrentPlayer());
+        System.out.println("WallPieceDection :" + findKingPosition(board).toString() + getCurrentPlayer().toString());
+        if (getPiece(finish) instanceof King) { // débloque les pièces clouées dans le cas où le roi est déplacé
+            listWall.addAll(wallPieceDetection(start, getPiece(finish).getColor()));
+            System.out.println("WallPieceDection King movement :" + start.toString() + getPiece(finish).getColor().toString());
         }
         List<Piece> listPiecesFinish = piecesToUpdateDetection(finish);
 
@@ -216,6 +234,36 @@ public class Board {
                 ;
             }
             possibleMovesCache.put(piece, tempList);
+        }
+        Object[] checkIsInCheck = isInCheck(board);
+        possibleMovesCacheEchec.clear();
+
+        if ((boolean) checkIsInCheck[0]) {
+            isInCheck = true;
+            System.out.println("Le roi est en échec par " + ((Piece) checkIsInCheck[1]).getNom() + " en " + ((Piece) checkIsInCheck[1]).getPosition());
+
+            @SuppressWarnings("unchecked")
+            List<Case> casesBlocage = (List<Case>) checkIsInCheck[2];
+
+            for (Map.Entry<Piece, List<Case>> entry : possibleMovesCache.entrySet()) {
+                Piece piece = entry.getKey();
+                if (piece.getColor() != currentPlayer) {
+                    continue;
+                }
+
+                List<Case> casesValidesEnEchec = new ArrayList<>();
+                for (Case c : entry.getValue()) {
+                    if (containsCaseByCoordinates(casesBlocage, c)) {
+                        casesValidesEnEchec.add(c);
+                    }
+                }
+
+                if (!casesValidesEnEchec.isEmpty()) {
+                    possibleMovesCacheEchec.put(piece, casesValidesEnEchec);
+                }
+            }
+        } else {
+            isInCheck = false;
         }
     }
 
@@ -255,7 +303,7 @@ public class Board {
         return true;
     }
 
-    private Case findKingPosition() {
+    private Case findKingPosition(Piece[][] boardCopy) {
         if (boardCopy == null) return null;
         for (int i = 0; i < boardCopy.length; i++) {
             for (int j = 0; j < boardCopy[i].length; j++) {
@@ -268,10 +316,14 @@ public class Board {
         return null;
     }
 
-    private boolean isInCheck() {
-        if (boardCopy == null) return false;
-        Case kingPosition = findKingPosition();
-        if (kingPosition == null) return false;
+    private Object[] isInCheck(Piece[][] boardCopy) {
+        Piece piece = null;
+        List<Case> blocage= new ArrayList<>();
+        if (boardCopy == null) return new Object[]{false, piece, blocage};
+
+        Case kingPosition = findKingPosition(boardCopy);
+        if (kingPosition == null) return new Object[]{false, piece, blocage};
+
         List<Direction> directionList = Arrays.stream(Direction.values()).limit(3).toList();
         boolean move;
 
@@ -289,12 +341,15 @@ public class Board {
                     range++;
                     newRow += direction[0];
                     newCol += direction[1];
+
                     if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                        blocage.add(new Case(newRow, newCol));
                         if (boardCopy[newRow][newCol] == null) {
                             continue;
                         } else if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
                                 && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType) && range <= boardCopy[newRow][newCol].getMoveRange()) {
-                            return true;
+                            piece = boardCopy[newRow][newCol];
+                            return new Object[]{true, piece, new ArrayList<>(blocage)};
                         } else {
                             move = false;
                         }
@@ -302,6 +357,7 @@ public class Board {
                         move = false;
                     }
                 }
+                blocage.clear();
             }
         }
 
@@ -315,11 +371,23 @@ public class Board {
             newRow = kingPosition.getRows() + direction[0];
             newCol = kingPosition.getColumns() + direction[1];
             if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
+                blocage.add(new Case(newRow, newCol));
                 if (boardCopy[newRow][newCol] != null
                         && boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
                         && boardCopy[newRow][newCol].getTypeOfMouvement().contains((this.getCurrentPlayer() == Couleur.WHITE ? Direction.BLACKPAWN : Direction.WHITEPAWN))) {
-                    return true;
+                    piece = boardCopy[newRow][newCol];
+                    return new Object[]{true, piece, new ArrayList<>(blocage)};
                 }
+            }
+            blocage.clear();
+        }
+        return new Object[]{false, piece, blocage};
+    }
+
+    private boolean containsCaseByCoordinates(List<Case> cases, Case target) {
+        for (Case c : cases) {
+            if (c.getRows() == target.getRows() && c.getColumns() == target.getColumns()) {
+                return true;
             }
         }
         return false;
@@ -341,7 +409,7 @@ public class Board {
         boardCopy[destination.getRows()][destination.getColumns()] = piece;
         boardCopy[start.getRows()][start.getColumns()] = null;
 
-        return !isInCheck();
+        return !(boolean) isInCheck(boardCopy)[0];
     }
 
     public Couleur getCurrentPlayer() {
@@ -354,6 +422,14 @@ public class Board {
 
     public Map<Piece,List<Case>> getPossibleMovesCache() {
         return possibleMovesCache;
+    }
+
+    public Map<Piece,List<Case>> getPossibleMovesCacheEchec() {
+        return possibleMovesCacheEchec;
+    }
+
+    public boolean getIsInCheck() {
+        return isInCheck;
     }
 
     public void printPossibleMovesCache() {

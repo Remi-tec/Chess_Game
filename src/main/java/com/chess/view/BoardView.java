@@ -90,13 +90,13 @@ public class BoardView extends GridPane {
     }
 
     private void handleCaseClick(int row, int column) {
-        System.out.println("PARAMÈTRES CLASS BoardView" + caseSelected + ", " + board.getCurrentPlayer());
+        System.out.println("CURRENT PLAYER : " + board.getCurrentPlayer());
         if (caseSelected == null) {
             Piece piece = board.getPiece(row, column);
 
             if (piece != null && piece.getColor() == board.getCurrentPlayer()) {
                 caseSelected = new Case(row, column);
-                tabPossibleMoves = board.getPossibleMovesCache().get(piece);
+                tabPossibleMoves = getMovesForPiece(piece);
                 System.out.println("Pièce sélectionnée : " + piece.getNom() + " en " + caseSelected); //Piece sélectionnée
             }
         } else {
@@ -104,7 +104,7 @@ public class BoardView extends GridPane {
             Piece piece = board.getPiece(row, column);
             if (piece != null && board.getPiece(caseDestination).getColor() == board.getCurrentPlayer()) {
                 caseSelected = caseDestination;
-                tabPossibleMoves = board.getPossibleMovesCache().get(piece);
+                tabPossibleMoves = getMovesForPiece(piece);
                 System.out.println("Pièce sélectionnée : " + piece.getNom() + " en " + caseSelected); //Piece sélectionnée
             } else {
 
@@ -124,9 +124,17 @@ public class BoardView extends GridPane {
             for (Case possibleMovetemp : tabPossibleMoves) { //Affichage des mouvements possibles dans la console
                 System.out.print(" : " + possibleMovetemp);
             }
+            System.out.println();
         }
         refreshBoard();
     }
+
+    private List<Case> getMovesForPiece(Piece piece) {
+        return board.getIsInCheck()
+                ? board.getPossibleMovesCacheEchec().get(piece)
+                : board.getPossibleMovesCache().get(piece);
+    }
+
     // Vérifie si la case cliquée est dans les mouvements possibles
     private boolean isPossibleMove(int row, int col) {
         if (tabPossibleMoves == null) return false;
