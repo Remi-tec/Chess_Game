@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 public class Board {
     private Piece[][] board;
     private Couleur currentPlayer;
+    private Couleur lastPlayer;
     private Piece[][] boardCopy;
     private List<Piece> kingsList;
     private Map<Piece, List<Case>> possibleMovesCache;
@@ -22,6 +23,7 @@ public class Board {
     public Board() {
         board = new Piece[8][8];
         currentPlayer = Couleur.WHITE;
+        lastPlayer = Couleur.BLACK;
         initializeBoard();
         initializeKingsList();
         initializePossibleMovesCache();
@@ -202,13 +204,15 @@ public class Board {
     public void updatePossibleMovesCache(Case start,Case finish) {
         List<Piece> listPiecesStart = piecesToUpdateDetection(start);
         listPiecesStart.add(getPiece(finish));
-        List<Piece> listWall = wallPieceDetection(findKingPosition(board), getCurrentPlayer());
-        System.out.println("WallPieceDection :" + findKingPosition(board).toString() + getCurrentPlayer().toString());
+        List<Piece> listWall = wallPieceDetection(findKingPosition(board, lastPlayer), lastPlayer);
+        System.out.println("WallPieceDection :" + findKingPosition(board, lastPlayer).toString() + lastPlayer.toString());
         if (getPiece(finish) instanceof King) { // débloque les pièces clouées dans le cas où le roi est déplacé
             listWall.addAll(wallPieceDetection(start, getPiece(finish).getColor()));
             System.out.println("WallPieceDection King movement :" + start.toString() + getPiece(finish).getColor().toString());
         }
         List<Piece> listPiecesFinish = piecesToUpdateDetection(finish);
+
+        listWall.addAll(kingsList); // Toujours mettre à jour les mouvements des rois pour la détection d'échec
 
         List<Piece> merged = Stream.concat(listPiecesStart.stream(), listPiecesFinish.stream())
                 .distinct()
@@ -235,7 +239,7 @@ public class Board {
             }
             possibleMovesCache.put(piece, tempList);
         }
-        Object[] checkIsInCheck = isInCheck(board);
+        Object[] checkIsInCheck = isInCheck(board, currentPlayer);
         possibleMovesCacheEchec.clear();
 
         if ((boolean) checkIsInCheck[0]) {
@@ -261,6 +265,10 @@ public class Board {
                 if (!casesValidesEnEchec.isEmpty()) {
                     possibleMovesCacheEchec.put(piece, casesValidesEnEchec);
                 }
+            }
+            Piece kingCurrentPlayer = kingsList.stream().filter(k -> k.getColor() == getCurrentPlayer()).findFirst().orElse(null);
+            if (kingCurrentPlayer != null) {
+                possibleMovesCacheEchec.put(kingCurrentPlayer, possibleMovesCache.get(kingCurrentPlayer));
             }
         } else {
             isInCheck = false;
@@ -298,30 +306,31 @@ public class Board {
         board[start.getRows()][start.getColumns()] = null;
         piece.setPosition(finish);
 
+        lastPlayer = currentPlayer;
         currentPlayer = (currentPlayer == Couleur.WHITE) ? Couleur.BLACK : Couleur.WHITE;
 
         return true;
     }
 
-    private Case findKingPosition(Piece[][] boardCopy) {
+    private Case findKingPosition(Piece[][] boardCopy, Couleur couleur) {
         if (boardCopy == null) return null;
         for (int i = 0; i < boardCopy.length; i++) {
             for (int j = 0; j < boardCopy[i].length; j++) {
                 Piece piece = boardCopy[i][j];
-                if (piece instanceof King && piece.getColor() == this.getCurrentPlayer()) {
-                    return piece.getPosition();
+                if (piece instanceof King && piece.getColor() == couleur) {
+                    return new Case(i, j);
                 }
             }
         }
         return null;
     }
 
-    private Object[] isInCheck(Piece[][] boardCopy) {
+    private Object[] isInCheck(Piece[][] boardCopy, Couleur kingColor) {
         Piece piece = null;
         List<Case> blocage= new ArrayList<>();
         if (boardCopy == null) return new Object[]{false, piece, blocage};
 
-        Case kingPosition = findKingPosition(boardCopy);
+        Case kingPosition = findKingPosition(boardCopy, kingColor);
         if (kingPosition == null) return new Object[]{false, piece, blocage};
 
         List<Direction> directionList = Arrays.stream(Direction.values()).limit(3).toList();
@@ -346,7 +355,7 @@ public class Board {
                         blocage.add(new Case(newRow, newCol));
                         if (boardCopy[newRow][newCol] == null) {
                             continue;
-                        } else if (boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
+                        } else if (boardCopy[newRow][newCol].getColor() != kingColor
                                 && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType) && range <= boardCopy[newRow][newCol].getMoveRange()) {
                             piece = boardCopy[newRow][newCol];
                             return new Object[]{true, piece, new ArrayList<>(blocage)};
@@ -365,7 +374,7 @@ public class Board {
         int[][] directions;
         int newRow;
         int newCol;
-        directions = this.getCurrentPlayer() == Couleur.WHITE ? Direction.WHITEPAWN.getDirections() : Direction.BLACKPAWN.getDirections();
+        directions = kingColor == Couleur.WHITE ? Direction.WHITEPAWN.getDirections() : Direction.BLACKPAWN.getDirections();
         directions = new int[][]{directions[2], directions[3]}; // Only diagonal attacks
         for (int[] direction : directions) {
             newRow = kingPosition.getRows() + direction[0];
@@ -373,8 +382,8 @@ public class Board {
             if (newRow < 8 && newRow >= 0 && newCol < 8 && newCol >= 0) {
                 blocage.add(new Case(newRow, newCol));
                 if (boardCopy[newRow][newCol] != null
-                        && boardCopy[newRow][newCol].getColor() != this.getCurrentPlayer()
-                        && boardCopy[newRow][newCol].getTypeOfMouvement().contains((this.getCurrentPlayer() == Couleur.WHITE ? Direction.BLACKPAWN : Direction.WHITEPAWN))) {
+                        && boardCopy[newRow][newCol].getColor() != kingColor
+                        && boardCopy[newRow][newCol].getTypeOfMouvement().contains((kingColor == Couleur.WHITE ? Direction.BLACKPAWN : Direction.WHITEPAWN))) {
                     piece = boardCopy[newRow][newCol];
                     return new Object[]{true, piece, new ArrayList<>(blocage)};
                 }
@@ -409,7 +418,7 @@ public class Board {
         boardCopy[destination.getRows()][destination.getColumns()] = piece;
         boardCopy[start.getRows()][start.getColumns()] = null;
 
-        return !(boolean) isInCheck(boardCopy)[0];
+        return !(boolean) isInCheck(boardCopy, piece.getColor())[0];
     }
 
     public Couleur getCurrentPlayer() {
