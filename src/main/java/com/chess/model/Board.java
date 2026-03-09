@@ -14,7 +14,6 @@ public class Board {
     private Piece[][] board;
     private Couleur currentPlayer;
     private Couleur lastPlayer;
-    private Piece[][] boardCopy;
     private List<Piece> kingsList;
     private Map<Piece, List<Case>> possibleMovesCache;
     private Map<Piece,List<Case>> possibleMovesCacheEchec;
@@ -267,8 +266,16 @@ public class Board {
                 }
             }
             Piece kingCurrentPlayer = kingsList.stream().filter(k -> k.getColor() == getCurrentPlayer()).findFirst().orElse(null);
-            if (kingCurrentPlayer != null) {
+            if (kingCurrentPlayer != null && !possibleMovesCache.get(kingCurrentPlayer).isEmpty()) {
                 possibleMovesCacheEchec.put(kingCurrentPlayer, possibleMovesCache.get(kingCurrentPlayer));
+            }
+            for (Map.Entry<Piece, List<Case>> entry : possibleMovesCacheEchec.entrySet()) {
+                Piece piece = entry.getKey();
+                System.out.println("Mouvements possibles pour " + piece.getNom() + " en " + piece.getPosition() + " :");
+                for (Case c : entry.getValue()) {
+                    System.out.print(" (" + c.getRows() + ", " + c.getColumns() + ")");
+                }
+                System.out.println("");
             }
         } else {
             isInCheck = false;
@@ -403,7 +410,7 @@ public class Board {
     }
 
     public boolean moveSimulation(Case start, Case destination) {
-        boardCopy = new Piece[8][8];
+        Piece[][] boardCopy = new Piece[8][8];
         for (int i = 0; i < board.length; i++) {
             for (int j = 0; j < board[i].length; j++) {
                 if (board[i][j] != null) {
