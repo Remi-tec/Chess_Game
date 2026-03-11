@@ -90,7 +90,19 @@ public class BoardView extends GridPane {
     }
 
     private void handleCaseClick(int row, int column) {
-        controller.handleCaseClick(row, column, this::refreshBoard);
+        controller.handleCaseClick(row, column, () -> {
+            refreshBoard();
+            checkGameOver();
+        });
+    }
+
+    private void checkGameOver() {
+        List<Object> result = controller.isGameOver();
+        if ((boolean) result.get(0)) {
+            String message = result.get(2) + " - Joueur " + result.get(1) + " a perdu !";
+            System.out.println("=== FIN DE PARTIE : " + message + " ===");
+            this.setDisable(true);
+        }
     }
 
     // Vérifie si la case cliquée est dans les mouvements possibles

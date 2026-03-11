@@ -14,6 +14,7 @@ public abstract class Piece {
     protected int moveCount = 0;
     protected List<Direction> typeOfMouvement;
     protected int moveRange;
+    protected boolean isStuck = false;
 
     public Piece(Couleur color,Case position, List<Direction> typeOfMouvement, int moveRange) {
         this.color = color;
@@ -96,6 +97,14 @@ public abstract class Piece {
 
     public  int getMoveRange(){
         return moveRange;
+    }
+
+    public boolean getIsStuck() {
+        return isStuck;
+    }
+
+    public void setIsStuck(boolean isStuck) {
+        this.isStuck = isStuck;
     }
 
     public abstract String getNom();

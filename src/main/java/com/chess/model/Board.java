@@ -153,57 +153,63 @@ public class Board {
         return piecesToUpdate;
     }
 
-    private List<Piece> wallPieceDetection(Case finish, Couleur color) {
-        List<Piece> pinned = new ArrayList<>();
+    private List<Piece> wallPieceDetection(Case kingReferenceCase, Couleur alliedColor) {
+        List<Piece> pinnedPieces = new ArrayList<>();
 
-        // Ne garder que les directions "rayons" (pas de L)
-        for (Direction dir : Arrays.asList(Direction.DIAGONAL, Direction.HORIZONTAL)) {
-            for (int[] direction : dir.getDirections()) {
-                int newRow = finish.getRows();
-                int newCol = finish.getColumns();
-                Piece firstEnemy = null;
-                Piece brotherCount = null;
+        for (Direction rayDirectionType : Arrays.asList(Direction.DIAGONAL, Direction.HORIZONTAL)) {
+            for (int[] rayStep : rayDirectionType.getDirections()) {
+                int scanRow = kingReferenceCase.getRows();
+                int scanCol = kingReferenceCase.getColumns();
+
+                Piece alliedCandidatePinned = null;
+                boolean enemyFound = false;
 
                 while (true) {
-                    newRow += direction[0];
-                    newCol += direction[1];
+                    scanRow += rayStep[0];
+                    scanCol += rayStep[1];
 
-                    if (newRow < 0 || newRow >= 8 || newCol < 0 || newCol >= 8) break;
+                    if (scanRow < 0 || scanRow >= 8 || scanCol < 0 || scanCol >= 8) break;
 
-                    Piece target = board[newRow][newCol];
-                    if (target == null) continue;
+                    Piece encounteredPiece = board[scanRow][scanCol];
+                    if (encounteredPiece == null) continue;
 
-                    if (target.getColor() == color) {
-                        brotherCount = target; // une pièce alliée entre le roi et la pièce potentiellement clouée
-                    }else {
-                        if(target.getTypeOfMouvement().contains(dir) && brotherCount != null) {
-                            pinned.add(brotherCount);
-                            break;// une pièce ennemie avant le roi => pas de clouage
+                    if (encounteredPiece.getColor() == alliedColor) {
+                        if (alliedCandidatePinned != null) {
+                            if (encounteredPiece.getIsStuck()) {
+                                alliedCandidatePinned.setIsStuck(false);
+                                pinnedPieces.add(alliedCandidatePinned);
+                            }
+                            // Deuxième pièce alliée sur le même rayon : aucun clouage possible, on arrête ce rayon.
+                            break;
+                        } else {
+                            alliedCandidatePinned = encounteredPiece;
                         }
-                    }
-
-                    if (target instanceof King) {
-                        if (firstEnemy != null) {
-                            pinned.add(firstEnemy);
-                        }
-                        break; // roi trouvé, on arrête dans cette direction
-                    }
-
-                    if (firstEnemy == null) {
-                        firstEnemy = target; // première pièce ennemie potentiellement clouée
                     } else {
-                        break; // une deuxième pièce ennemie => pas de clouage
+                        // Pièce ennemie : clouage si elle se déplace sur ce type de rayon et qu'une alliée est devant.
+                        if (encounteredPiece.getTypeOfMouvement().contains(rayDirectionType) && alliedCandidatePinned != null) {
+                            alliedCandidatePinned.setIsStuck(true);
+                            pinnedPieces.add(alliedCandidatePinned);
+                        }
+                        enemyFound = true;
+                        break; // Pièce ennemie bloque le rayon dans tous les cas
                     }
+                }
+
+                // Rayon sorti du plateau sans pièce ennemie :
+                // si la candidate était clouée avant, elle ne l'est plus.
+                if (!enemyFound && alliedCandidatePinned != null && alliedCandidatePinned.getIsStuck()) {
+                    alliedCandidatePinned.setIsStuck(false);
+                    pinnedPieces.add(alliedCandidatePinned);
                 }
             }
         }
-        return pinned;
+        return pinnedPieces;
     }
 
     public void updatePossibleMovesCache(Case start,Case finish) {
         List<Piece> listPiecesStart = piecesToUpdateDetection(start);
         listPiecesStart.add(getPiece(finish));
-        List<Piece> listWall = wallPieceDetection(findKingPosition(board, lastPlayer), lastPlayer);
+        List<Piece> listWall = wallPieceDetection(findKingPosition(board, currentPlayer), currentPlayer);
         System.out.println("WallPieceDection :" + findKingPosition(board, lastPlayer).toString() + lastPlayer.toString());
         if (getPiece(finish) instanceof King) { // débloque les pièces clouées dans le cas où le roi est déplacé
             listWall.addAll(wallPieceDetection(start, getPiece(finish).getColor()));
@@ -307,6 +313,11 @@ public class Board {
 
         if (!piece.canMove(finish, board, tabPossibleMoves)) {
             return false;
+        }
+
+        Piece capturedPiece = board[finish.getRows()][finish.getColumns()];
+        if (capturedPiece != null) {
+            possibleMovesCache.remove(capturedPiece);
         }
 
         board[finish.getRows()][finish.getColumns()] = piece;

@@ -4,7 +4,9 @@ import com.chess.model.Board;
 import com.chess.model.Case;
 import com.chess.model.pieces.Piece;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class BoardController {
     private Board board;
@@ -54,6 +56,24 @@ public class BoardController {
             }
             System.out.println();
         }
+    }
+
+    public List<Object> isGameOver() {
+        Map<Piece, List<Case>> cache = board.getIsInCheck()
+                ? board.getPossibleMovesCacheEchec()
+                : board.getPossibleMovesCache();
+        boolean allListsEmptyForCurrentPlayer = cache.entrySet().stream()
+                .filter(e -> e.getKey().getColor() == board.getCurrentPlayer())
+                .allMatch(e -> e.getValue() == null || e.getValue().isEmpty());
+
+        if (allListsEmptyForCurrentPlayer) {
+            if (board.getIsInCheck()) {
+                return List.of(true, board.getCurrentPlayer(), "Echec et mat");
+            } else {
+                return List.of(true, board.getCurrentPlayer(), "Pat");
+            }
+        }
+        return Arrays.asList(false, null, null);
     }
 
     public List<Case> getMovesForPiece(Piece piece) {
