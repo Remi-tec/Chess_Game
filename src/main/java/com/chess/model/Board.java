@@ -379,7 +379,9 @@ public class Board {
                         if (boardCopy[newRow][newCol] == null) {
                             continue;
                         } else if (boardCopy[newRow][newCol].getColor() != kingColor
-                                && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType) && range <= boardCopy[newRow][newCol].getMoveRange() && boardCopy[newRow][newCol] != pieceWhoCheck ) {
+                                && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType) 
+                                && range <= boardCopy[newRow][newCol].getMoveRange() 
+                                && boardCopy[newRow][newCol] != pieceWhoCheck ) {
                             piece = boardCopy[newRow][newCol];
                             return new Object[]{true, piece, new ArrayList<>(blocage)};
                         } else {
@@ -441,7 +443,9 @@ public class Board {
         boardCopy[destination.getRows()][destination.getColumns()] = piece;
         boardCopy[start.getRows()][start.getColumns()] = null;
 
-        return !(boolean) isInCheck(boardCopy, piece.getColor(),pieceWhoCheck)[0];
+        // Pour un déplacement du roi, ne pas ignorer la pièce qui donnait échec.
+        Piece ignoredCheckingPiece = (piece instanceof King) ? null : pieceWhoCheck;
+        return !(boolean) isInCheck(boardCopy, piece.getColor(), ignoredCheckingPiece)[0];
     }
 
     public Couleur getCurrentPlayer() {
