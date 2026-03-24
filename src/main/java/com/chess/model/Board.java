@@ -64,10 +64,9 @@ public class Board {
                 if (piece != null) {
                     List<Case> tempList = new java.util.ArrayList<>();
                     for (Case possibleMove : piece.getPossibleMoves(board)) {
-                        if (moveSimulation(piece.getPosition(), possibleMove)) {
+                        if (moveSimulation(piece.getPosition(), possibleMove,null)) {
                             tempList.add(possibleMove);
                         }
-                        ;
                     }
                     possibleMovesCache.put(piece, tempList);
                 }
@@ -207,6 +206,14 @@ public class Board {
     }
 
     public void updatePossibleMovesCache(Case start,Case finish) {
+        Piece pieceWhoCheck = null;
+        Object[] checkIsInCheck = isInCheck(board, currentPlayer,pieceWhoCheck);
+        possibleMovesCacheEchec.clear();
+
+        if ((boolean) checkIsInCheck[0]) {
+            pieceWhoCheck = (Piece) checkIsInCheck[1];
+        }
+
         List<Piece> listPiecesStart = piecesToUpdateDetection(start);
         listPiecesStart.add(getPiece(finish));
         List<Piece> listWall = wallPieceDetection(findKingPosition(board, currentPlayer), currentPlayer);
@@ -237,15 +244,13 @@ public class Board {
         for (Piece piece : merged) {
             List<Case> tempList = new java.util.ArrayList<>();
             for (Case possibleMove : piece.getPossibleMoves(board)) {
-                if (moveSimulation(piece.getPosition(), possibleMove)) {
+                if (moveSimulation(piece.getPosition(), possibleMove,pieceWhoCheck)) {
                     tempList.add(possibleMove);
                 }
                 ;
             }
             possibleMovesCache.put(piece, tempList);
         }
-        Object[] checkIsInCheck = isInCheck(board, currentPlayer);
-        possibleMovesCacheEchec.clear();
 
         if ((boolean) checkIsInCheck[0]) {
             isInCheck = true;
@@ -343,7 +348,7 @@ public class Board {
         return null;
     }
 
-    private Object[] isInCheck(Piece[][] boardCopy, Couleur kingColor) {
+    private Object[] isInCheck(Piece[][] boardCopy, Couleur kingColor, Piece pieceWhoCheck) {
         Piece piece = null;
         List<Case> blocage= new ArrayList<>();
         if (boardCopy == null) return new Object[]{false, piece, blocage};
@@ -374,7 +379,7 @@ public class Board {
                         if (boardCopy[newRow][newCol] == null) {
                             continue;
                         } else if (boardCopy[newRow][newCol].getColor() != kingColor
-                                && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType) && range <= boardCopy[newRow][newCol].getMoveRange()) {
+                                && boardCopy[newRow][newCol].getTypeOfMouvement().contains(directionType) && range <= boardCopy[newRow][newCol].getMoveRange() && boardCopy[newRow][newCol] != pieceWhoCheck ) {
                             piece = boardCopy[newRow][newCol];
                             return new Object[]{true, piece, new ArrayList<>(blocage)};
                         } else {
@@ -420,7 +425,7 @@ public class Board {
         return false;
     }
 
-    public boolean moveSimulation(Case start, Case destination) {
+    public boolean moveSimulation(Case start, Case destination,Piece pieceWhoCheck) {
         Piece[][] boardCopy = new Piece[8][8];
         for (int i = 0; i < board.length; i++) {
             for (int j = 0; j < board[i].length; j++) {
@@ -436,7 +441,7 @@ public class Board {
         boardCopy[destination.getRows()][destination.getColumns()] = piece;
         boardCopy[start.getRows()][start.getColumns()] = null;
 
-        return !(boolean) isInCheck(boardCopy, piece.getColor())[0];
+        return !(boolean) isInCheck(boardCopy, piece.getColor(),pieceWhoCheck)[0];
     }
 
     public Couleur getCurrentPlayer() {

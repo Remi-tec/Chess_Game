@@ -16,26 +16,30 @@ import java.util.List;
 
 public class BoardView extends GridPane {
     private static final int CASE_SIZE = 75;
-    private Board board;
-    private BoardController controller;
+    private final Board board;
+    private final BoardController controller;
+    private final StackPane[][] cellPanes = new StackPane[8][8];
+    private final Circle[][] moveIndicators = new Circle[8][8];
+    private final Text[][] pieceTexts = new Text[8][8];
 
     public BoardView(Board board) {
         this.board = board;
         this.controller = new BoardController(board);
-        drawBoard();
+        initializeBoardUI();
+        updateBoardState();
     }
 
-    private void drawBoard() {
+    private void initializeBoardUI() {
         for (int column = 0; column < 8; column ++) {
             for (int row = 0; row < 8; row++) {
-                boolean isPossibleMove = isPossibleMove(row, column);
-                StackPane casePane = createCase(row, column, isPossibleMove);
+                StackPane casePane = createCase(row, column);
+                cellPanes[row][column] = casePane;
                 this.add(casePane, row, column);
             }
         }
     }
 
-    private StackPane createCase(int row, int colunm, boolean isPossibleMove) {
+    private StackPane createCase(int row, int colunm) {
         StackPane casePane = new StackPane();
 
 
@@ -45,20 +49,18 @@ public class BoardView extends GridPane {
 
         casePane.getChildren().add(rectangle);
 
-        if (isPossibleMove) {
-            Circle circle = new Circle(CASE_SIZE / 4);
-            circle.setFill(Color.GREY);
-            //rectangle.setStrokeWidth(3);
-            casePane.getChildren().add(circle);
-        }
+        Circle circle = new Circle(CASE_SIZE / 4);
+        circle.setFill(Color.GREY);
+        circle.setVisible(false);
+        circle.setMouseTransparent(true);
+        moveIndicators[row][colunm] = circle;
+        casePane.getChildren().add(circle);
 
-        Piece piece = board.getPiece(row, colunm);
-        if (piece != null) {
-            Text textePiece = new Text(getSymbolPiece(piece));
-            textePiece.setFont(new Font(50));
-            textePiece.setFill(piece.getColor() == com.chess.model.Couleur.WHITE ? Color.WHITE : Color.BLACK);
-            casePane.getChildren().add(textePiece);
-        }
+        Text textePiece = new Text("");
+        textePiece.setFont(new Font(50));
+        textePiece.setMouseTransparent(true);
+        pieceTexts[row][colunm] = textePiece;
+        casePane.getChildren().add(textePiece);
 
         final int rowFinal = row;
         final int columnFinal = colunm;
@@ -105,20 +107,34 @@ public class BoardView extends GridPane {
         }
     }
 
-    // Vérifie si la case cliquée est dans les mouvements possibles
-    private boolean isPossibleMove(int row, int col) {
+    private void updateBoardState() {
+        boolean[][] possibleMovesMask = new boolean[8][8];
         List<Case> tabPossibleMoves = controller.getTabPossibleMoves();
-        if (tabPossibleMoves == null) return false;
-        for (Case c : tabPossibleMoves) {
-            if (c != null && c.getRows() == row && c.getColumns() == col) {
-                return true;
+        if (tabPossibleMoves != null) {
+            for (Case c : tabPossibleMoves) {
+                if (c != null) {
+                    possibleMovesMask[c.getRows()][c.getColumns()] = true;
+                }
             }
         }
-        return false;
+
+        for (int row = 0; row < 8; row++) {
+            for (int column = 0; column < 8; column++) {
+                moveIndicators[row][column].setVisible(possibleMovesMask[row][column]);
+
+                Piece piece = board.getPiece(row, column);
+                Text pieceText = pieceTexts[row][column];
+                if (piece != null) {
+                    pieceText.setText(getSymbolPiece(piece));
+                    pieceText.setFill(piece.getColor() == com.chess.model.Couleur.WHITE ? Color.WHITE : Color.BLACK);
+                } else {
+                    pieceText.setText("");
+                }
+            }
+        }
     }
 
     private void refreshBoard() {
-        this.getChildren().clear();
-        drawBoard();
+        updateBoardState();
     }
 }
