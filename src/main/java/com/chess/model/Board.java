@@ -64,7 +64,7 @@ public class Board {
                 if (piece != null) {
                     List<Case> tempList = new java.util.ArrayList<>();
                     for (Case possibleMove : piece.getPossibleMoves(board)) {
-                        if (moveSimulation(piece.getPosition(), possibleMove,null)) {
+                        if (isMoveValidForCache(piece, possibleMove, tempList, null)) {
                             tempList.add(possibleMove);
                         }
                     }
@@ -244,10 +244,9 @@ public class Board {
         for (Piece piece : merged) {
             List<Case> tempList = new java.util.ArrayList<>();
             for (Case possibleMove : piece.getPossibleMoves(board)) {
-                if (moveSimulation(piece.getPosition(), possibleMove,pieceWhoCheck)) {
+                if (isMoveValidForCache(piece, possibleMove, tempList, pieceWhoCheck)) {
                     tempList.add(possibleMove);
                 }
-                ;
             }
             possibleMovesCache.put(piece, tempList);
         }
@@ -320,6 +319,11 @@ public class Board {
             return false;
         }
 
+        boolean isCastlingMove = isCastlingMove(piece, start, finish);
+        if (isCastlingMove && !hasValidCastlingRook(board, piece, start, finish)) {
+            return false;
+        }
+
         Piece capturedPiece = board[finish.getRows()][finish.getColumns()];
         if (capturedPiece != null) {
             possibleMovesCache.remove(capturedPiece);
@@ -328,6 +332,10 @@ public class Board {
         board[finish.getRows()][finish.getColumns()] = piece;
         board[start.getRows()][start.getColumns()] = null;
         piece.setPosition(finish);
+
+        if (isCastlingMove) {
+            moveCastlingRook(board, start, finish, true);
+        }
 
         lastPlayer = currentPlayer;
         currentPlayer = (currentPlayer == Couleur.WHITE) ? Couleur.BLACK : Couleur.WHITE;
@@ -427,6 +435,37 @@ public class Board {
         return false;
     }
 
+    private boolean isMoveValidForCache(Piece piece, Case possibleMove, List<Case> tempList, Piece pieceWhoCheck) {
+        if (!moveSimulation(piece.getPosition(), possibleMove, pieceWhoCheck)) {
+            return false;
+        }
+
+        if (!(piece instanceof King)) {
+            return true;
+        }
+
+        int deltaRow = possibleMove.getRows() - piece.getPosition().getRows();
+        int deltaCol = possibleMove.getColumns() - piece.getPosition().getColumns();
+        boolean isCastlingMove = deltaCol == 0 && Math.abs(deltaRow) == 2;
+
+        if (!isCastlingMove) {
+            return true;
+        }
+
+        if (piece.getHasMove()) {
+            return false;
+        }
+
+        // Castling is forbidden while the king is currently in check.
+        if ((boolean) isInCheck(board, piece.getColor(), null)[0]) {
+            return false;
+        }
+
+        int step = deltaRow > 0 ? 1 : -1;
+        Case intermediateCase = new Case(piece.getPosition().getRows() + step, piece.getPosition().getColumns());
+        return containsCaseByCoordinates(tempList, intermediateCase);
+    }
+
     public boolean moveSimulation(Case start, Case destination,Piece pieceWhoCheck) {
         Piece[][] boardCopy = new Piece[8][8];
         for (int i = 0; i < board.length; i++) {
@@ -440,12 +479,50 @@ public class Board {
         Piece piece = boardCopy[start.getRows()][start.getColumns()];
         if (piece == null) return false;
 
+        boolean isCastlingMove = isCastlingMove(piece, start, destination);
+        if (isCastlingMove && !hasValidCastlingRook(boardCopy, piece, start, destination)) {
+            return false;
+        }
+
         boardCopy[destination.getRows()][destination.getColumns()] = piece;
         boardCopy[start.getRows()][start.getColumns()] = null;
+
+        if (isCastlingMove) {
+            moveCastlingRook(boardCopy, start, destination, false);
+        }
 
         // Pour un déplacement du roi, ne pas ignorer la pièce qui donnait échec.
         Piece ignoredCheckingPiece = (piece instanceof King) ? null : pieceWhoCheck;
         return !(boolean) isInCheck(boardCopy, piece.getColor(), ignoredCheckingPiece)[0];
+    }
+
+    private boolean isCastlingMove(Piece piece, Case start, Case finish) {
+        if (!(piece instanceof King)) {
+            return false;
+        }
+        return start.getColumns() == finish.getColumns()
+                && Math.abs(finish.getRows() - start.getRows()) == 2;
+    }
+
+    private boolean hasValidCastlingRook(Piece[][] boardState, Piece king, Case start, Case finish) {
+        int step = finish.getRows() > start.getRows() ? 1 : -1;
+        int rookStartRow = step > 0 ? 7 : 0;
+        Piece rook = boardState[rookStartRow][start.getColumns()];
+        return rook instanceof Rook && rook.getColor() == king.getColor() && !rook.getHasMove();
+    }
+
+    private void moveCastlingRook(Piece[][] boardState, Case kingStart, Case kingFinish, boolean updateRookPosition) {
+        int step = kingFinish.getRows() > kingStart.getRows() ? 1 : -1;
+        int rookStartRow = step > 0 ? 7 : 0;
+        int rookEndRow = kingFinish.getRows() - step;
+
+        Piece rook = boardState[rookStartRow][kingStart.getColumns()];
+        boardState[rookEndRow][kingStart.getColumns()] = rook;
+        boardState[rookStartRow][kingStart.getColumns()] = null;
+
+        if (updateRookPosition && rook != null) {
+            rook.setPosition(new Case(rookEndRow, kingStart.getColumns()));
+        }
     }
 
     public Couleur getCurrentPlayer() {
