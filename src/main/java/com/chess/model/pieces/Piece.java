@@ -17,6 +17,7 @@ public abstract class Piece {
     protected boolean isStuck = false;
     protected int distance = 0;
     protected List<Case> moveHistoric = new ArrayList<>();
+    protected int firstMove = -1;
 
     public Piece(Couleur color,Case position, List<Direction> typeOfMouvement, int moveRange) {
         this.color = color;
@@ -48,6 +49,10 @@ public abstract class Piece {
     }
 
     public void setPosition(Case position) {
+        setPosition(position, -1);
+    }
+
+    public void setPosition(Case position, int moveNumber) {
         // Calculer la distance parcourue jusqu'à cette position
         if (this.position != null) {
             int deltaRow = Math.abs(position.getRows() - this.position.getRows());
@@ -61,6 +66,9 @@ public abstract class Piece {
 
         // Mettre à jour la position
         this.position = position;
+        if (!this.hasMove && moveNumber >= 0) {
+            this.firstMove = moveNumber;
+        }
         this.hasMove = true;
         this.moveCount++;
     }
@@ -75,6 +83,10 @@ public abstract class Piece {
     };
 
     public Case[] getPossibleMoves(Piece[][] board) {
+        return getPossibleMoves(board, -1);
+    }
+
+    public Case[] getPossibleMoves(Piece[][] board, int moveNumber) {
         ArrayList<Case> possibleMoves = new ArrayList<>();
         int[][] directions = getMergeTypeOfMouvement(typeOfMouvement);
         int newRow;
@@ -123,6 +135,10 @@ public abstract class Piece {
 
     public int getDistance() {
         return distance;
+    }
+
+    public int getFirstMove() {
+        return firstMove;
     }
 
     public List<Case> getMoveHistoric() {

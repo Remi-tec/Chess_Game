@@ -17,11 +17,15 @@ public class Board {
     private Map<Piece, List<Case>> possibleMovesCache;
     private Map<Piece,List<Case>> possibleMovesCacheEchec;
     private boolean isInCheck;
+    private int moveNumber;
+    private List<Piece> deferredUpdate;
 
     public Board() {
         board = new Piece[8][8];
         currentPlayer = Couleur.WHITE;
         lastPlayer = Couleur.BLACK;
+        moveNumber = 0;
+        deferredUpdate = new ArrayList<>();
         initializeBoard();
         initializeKingsList();
         initializePossibleMovesCache();
@@ -62,7 +66,7 @@ public class Board {
                 Piece piece = board[i][j];
                 if (piece != null) {
                     List<Case> tempList = new java.util.ArrayList<>();
-                    for (Case possibleMove : piece.getPossibleMoves(board)) {
+                    for (Case possibleMove : piece.getPossibleMoves(board, moveNumber)) {
                         if (isMoveValidForCache(piece, possibleMove, tempList, null)) {
                             tempList.add(possibleMove);
                         }
@@ -235,6 +239,12 @@ public class Board {
                     .collect(Collectors.toList());
         }
 
+        // Les pions différés du tour précédent sont recalculés ici, puis consommés.
+        merged = Stream.concat(merged.stream(), deferredUpdate.stream())
+                .distinct()
+                .collect(Collectors.toList());
+        deferredUpdate.clear();
+
         for (Piece piece : merged) {
             System.out.println("Mise à jour du cache pour " + piece.getNom() + " en " + piece.getPosition());
         }
@@ -242,7 +252,7 @@ public class Board {
 
         for (Piece piece : merged) {
             List<Case> tempList = new java.util.ArrayList<>();
-            for (Case possibleMove : piece.getPossibleMoves(board)) {
+            for (Case possibleMove : piece.getPossibleMoves(board, moveNumber)) {
                 if (isMoveValidForCache(piece, possibleMove, tempList, pieceWhoCheck)) {
                     tempList.add(possibleMove);
                 }
@@ -323,6 +333,8 @@ public class Board {
             return false;
         }
 
+        int nextMoveNumber = moveNumber + 1;
+
         // Gestion de la prise en passant pour les pions
         boolean isEnPassantMove = false;
         Piece capturedPiece = board[finish.getRows()][finish.getColumns()];
@@ -331,8 +343,15 @@ public class Board {
             Math.abs(finish.getRows() - start.getRows()) == 1 &&
             Math.abs(finish.getColumns() - start.getColumns()) == 1) {
             // C'est un mouvement diagonal du pion vers une case vide : prise en passant
-            isEnPassantMove = true;
-            capturedPiece = board[start.getRows()][finish.getColumns()];
+            Piece adjacentPiece = board[finish.getRows()][start.getColumns()];
+            if (adjacentPiece instanceof Pawn
+                    && adjacentPiece.getColor() != piece.getColor()
+                    && adjacentPiece.getDistance() == 2
+                    && adjacentPiece.getMoveHistoricSize() == 1
+                    && adjacentPiece.getFirstMove() == moveNumber) {
+                isEnPassantMove = true;
+                capturedPiece = adjacentPiece;
+            }
         }
 
         if (capturedPiece != null) {
@@ -341,16 +360,19 @@ public class Board {
 
         board[finish.getRows()][finish.getColumns()] = piece;
         board[start.getRows()][start.getColumns()] = null;
-        piece.setPosition(finish);
+        piece.setPosition(finish, nextMoveNumber);
 
         // Supprimer le pion capturé en passant
         if (isEnPassantMove && capturedPiece != null) {
-            board[start.getRows()][finish.getColumns()] = null;
+            board[finish.getRows()][start.getColumns()] = null;
         }
 
         if (isCastlingMove) {
-            moveCastlingRook(board, start, finish, true);
+            moveCastlingRook(board, start, finish, true, nextMoveNumber);
         }
+
+        moveNumber = nextMoveNumber;
+        deferredUpdate.addAll(collectDeferredUpdates(piece));
 
         lastPlayer = currentPlayer;
         currentPlayer = (currentPlayer == Couleur.WHITE) ? Couleur.BLACK : Couleur.WHITE;
@@ -500,8 +522,12 @@ public class Board {
                 && destinationPiece == null
                 && Math.abs(destination.getRows() - start.getRows()) == 1
                 && Math.abs(destination.getColumns() - start.getColumns()) == 1) {
-            Piece adjacentPiece = boardCopy[start.getRows()][destination.getColumns()];
-            if (adjacentPiece instanceof Pawn && adjacentPiece.getColor() != piece.getColor()) {
+            Piece adjacentPiece = boardCopy[destination.getRows()][start.getColumns()];
+            if (adjacentPiece instanceof Pawn
+                    && adjacentPiece.getColor() != piece.getColor()
+                    && adjacentPiece.getDistance() == 2
+                    && adjacentPiece.getMoveHistoricSize() == 1
+                    && adjacentPiece.getFirstMove() == moveNumber) {
                 isEnPassantMove = true;
             }
         }
@@ -515,16 +541,45 @@ public class Board {
         boardCopy[start.getRows()][start.getColumns()] = null;
 
         if (isEnPassantMove) {
-            boardCopy[start.getRows()][destination.getColumns()] = null;
+            boardCopy[destination.getRows()][start.getColumns()] = null;
         }
 
         if (isCastlingMove) {
-            moveCastlingRook(boardCopy, start, destination, false);
+            moveCastlingRook(boardCopy, start, destination, false, moveNumber);
         }
 
         // Pour un déplacement du roi, ne pas ignorer la pièce qui donnait échec.
         Piece ignoredCheckingPiece = (piece instanceof King) ? null : pieceWhoCheck;
-        return !(boolean) isInCheck(boardCopy, piece.getColor(), ignoredCheckingPiece)[0];
+        boolean moveValid = !(boolean) isInCheck(boardCopy, piece.getColor(), ignoredCheckingPiece)[0];
+        // Ajout de la piece dans deferredUpdate si la prise en passant est valide
+        if (moveValid && isEnPassantMove && !deferredUpdate.contains(piece)) {
+            deferredUpdate.add(piece);
+        }
+
+        return moveValid;
+    }
+
+    private List<Piece> collectDeferredUpdates(Piece movedPiece) {
+        List<Piece> nextDeferredUpdate = new ArrayList<>();
+
+        if (!(movedPiece instanceof Pawn) || movedPiece.getDistance() != 2 || movedPiece.getMoveHistoricSize() != 1) {
+            return nextDeferredUpdate;
+        }
+
+        int currentRow = movedPiece.getPosition().getRows();
+        int currentCol = movedPiece.getPosition().getColumns();
+        int[] adjacentRows = {currentRow - 1, currentRow + 1};
+
+        for (int adjacentRow : adjacentRows) {
+            if (adjacentRow >= 0 && adjacentRow < 8) {
+                Piece adjacentPiece = board[adjacentRow][currentCol];
+                if (adjacentPiece instanceof Pawn && adjacentPiece.getColor() != movedPiece.getColor()) {
+                    nextDeferredUpdate.add(adjacentPiece);
+                }
+            }
+        }
+
+        return nextDeferredUpdate;
     }
 
     private boolean isCastlingMove(Piece piece, Case start, Case finish) {
@@ -542,7 +597,7 @@ public class Board {
         return rook instanceof Rook && rook.getColor() == king.getColor() && !rook.getHasMove();
     }
 
-    private void moveCastlingRook(Piece[][] boardState, Case kingStart, Case kingFinish, boolean updateRookPosition) {
+    private void moveCastlingRook(Piece[][] boardState, Case kingStart, Case kingFinish, boolean updateRookPosition, int moveNumberForUpdate) {
         int step = kingFinish.getRows() > kingStart.getRows() ? 1 : -1;
         int rookStartRow = step > 0 ? 7 : 0;
         int rookEndRow = kingFinish.getRows() - step;
@@ -552,7 +607,7 @@ public class Board {
         boardState[rookStartRow][kingStart.getColumns()] = null;
 
         if (updateRookPosition && rook != null) {
-            rook.setPosition(new Case(rookEndRow, kingStart.getColumns()));
+            rook.setPosition(new Case(rookEndRow, kingStart.getColumns()), moveNumberForUpdate);
         }
     }
 
@@ -574,6 +629,10 @@ public class Board {
 
     public boolean getIsInCheck() {
         return isInCheck;
+    }
+
+    public int getMoveNumber() {
+        return moveNumber;
     }
 
     public void printPossibleMovesCache() {
