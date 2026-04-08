@@ -1,7 +1,6 @@
 package com.chess.model;
 
 import com.chess.model.pieces.*;
-import javafx.scene.paint.Color;
 
 import java.util.Arrays;
 import java.util.List;
@@ -285,7 +284,7 @@ public class Board {
                 for (Case c : entry.getValue()) {
                     System.out.print(" (" + c.getRows() + ", " + c.getColumns() + ")");
                 }
-                System.out.println("");
+                System.out.println(" ");
             }
         } else {
             isInCheck = false;
@@ -324,7 +323,18 @@ public class Board {
             return false;
         }
 
+        // Gestion de la prise en passant pour les pions
+        boolean isEnPassantMove = false;
         Piece capturedPiece = board[finish.getRows()][finish.getColumns()];
+
+        if (piece instanceof Pawn && capturedPiece == null &&
+            Math.abs(finish.getRows() - start.getRows()) == 1 &&
+            Math.abs(finish.getColumns() - start.getColumns()) == 1) {
+            // C'est un mouvement diagonal du pion vers une case vide : prise en passant
+            isEnPassantMove = true;
+            capturedPiece = board[start.getRows()][finish.getColumns()];
+        }
+
         if (capturedPiece != null) {
             possibleMovesCache.remove(capturedPiece);
         }
@@ -332,6 +342,11 @@ public class Board {
         board[finish.getRows()][finish.getColumns()] = piece;
         board[start.getRows()][start.getColumns()] = null;
         piece.setPosition(finish);
+
+        // Supprimer le pion capturé en passant
+        if (isEnPassantMove && capturedPiece != null) {
+            board[start.getRows()][finish.getColumns()] = null;
+        }
 
         if (isCastlingMove) {
             moveCastlingRook(board, start, finish, true);
@@ -479,6 +494,18 @@ public class Board {
         Piece piece = boardCopy[start.getRows()][start.getColumns()];
         if (piece == null) return false;
 
+        boolean isEnPassantMove = false;
+        Piece destinationPiece = boardCopy[destination.getRows()][destination.getColumns()];
+        if (piece instanceof Pawn
+                && destinationPiece == null
+                && Math.abs(destination.getRows() - start.getRows()) == 1
+                && Math.abs(destination.getColumns() - start.getColumns()) == 1) {
+            Piece adjacentPiece = boardCopy[start.getRows()][destination.getColumns()];
+            if (adjacentPiece instanceof Pawn && adjacentPiece.getColor() != piece.getColor()) {
+                isEnPassantMove = true;
+            }
+        }
+
         boolean isCastlingMove = isCastlingMove(piece, start, destination);
         if (isCastlingMove && !hasValidCastlingRook(boardCopy, piece, start, destination)) {
             return false;
@@ -486,6 +513,10 @@ public class Board {
 
         boardCopy[destination.getRows()][destination.getColumns()] = piece;
         boardCopy[start.getRows()][start.getColumns()] = null;
+
+        if (isEnPassantMove) {
+            boardCopy[start.getRows()][destination.getColumns()] = null;
+        }
 
         if (isCastlingMove) {
             moveCastlingRook(boardCopy, start, destination, false);

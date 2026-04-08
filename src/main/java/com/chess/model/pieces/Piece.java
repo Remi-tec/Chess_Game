@@ -15,6 +15,8 @@ public abstract class Piece {
     protected List<Direction> typeOfMouvement;
     protected int moveRange;
     protected boolean isStuck = false;
+    protected int distance = 0;
+    protected List<Case> moveHistoric = new ArrayList<>();
 
     public Piece(Couleur color,Case position, List<Direction> typeOfMouvement, int moveRange) {
         this.color = color;
@@ -46,6 +48,18 @@ public abstract class Piece {
     }
 
     public void setPosition(Case position) {
+        // Calculer la distance parcourue jusqu'à cette position
+        if (this.position != null) {
+            int deltaRow = Math.abs(position.getRows() - this.position.getRows());
+            int deltaCol = Math.abs(position.getColumns() - this.position.getColumns());
+            int moveDistance = Math.max(deltaRow, deltaCol);
+            this.distance += moveDistance;
+        }
+
+        // Ajouter la nouvelle position à l'historique des mouvements
+        this.moveHistoric.add(position);
+
+        // Mettre à jour la position
         this.position = position;
         this.hasMove = true;
         this.moveCount++;
@@ -105,6 +119,25 @@ public abstract class Piece {
 
     public void setIsStuck(boolean isStuck) {
         this.isStuck = isStuck;
+    }
+
+    public int getDistance() {
+        return distance;
+    }
+
+    public List<Case> getMoveHistoric() {
+        return new ArrayList<>(moveHistoric);
+    }
+
+    public int getMoveHistoricSize() {
+        return moveHistoric.size();
+    }
+
+    public Case getMoveHistoricAt(int index) {
+        if (index >= 0 && index < moveHistoric.size()) {
+            return moveHistoric.get(index);
+        }
+        return null;
     }
 
     public abstract String getNom();

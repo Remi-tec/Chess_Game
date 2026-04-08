@@ -51,7 +51,53 @@ public class Pawn extends Piece {
                 }
             }
         }
+        
+        // En passant capture
+        checkEnPassantCapture(board, possibleMoves);
+        
         return possibleMoves.toArray(new Case[0]);
+    }
+    
+    /**
+     * Vérifie et ajoute les coups de prise en passant disponibles.
+     * Conditions: pion ennemi adjacent avec distance == 2 et moveHistoric.size() == 1
+     */
+    private void checkEnPassantCapture(Piece[][] board, List<Case> possibleMoves) {
+        int currentRow = position.getRows();
+        int currentCol = position.getColumns();
+        
+        // Vérifier les pions adjacents (gauche et droite)
+        int[] adjacentCols = {currentCol - 1, currentCol + 1};
+        
+        for (int adjacentCol : adjacentCols) {
+            // Vérifier que la colonne est valide
+            if (adjacentCol >= 0 && adjacentCol < 8) {
+                Piece adjacentPiece = board[currentRow][adjacentCol];
+                
+                // Vérifier que c'est un pion ennemi
+                if (adjacentPiece != null && 
+                    adjacentPiece instanceof Pawn && 
+                    adjacentPiece.getColor() != this.color) {
+                    
+                    // Vérifier les conditions: distance == 2 et moveHistoric.size() == 1
+                    if (adjacentPiece.getDistance() == 2 && 
+                        adjacentPiece.getMoveHistoricSize() == 1) {
+                        
+                        // Déterminer la direction du pion actuel (vers l'avant)
+                        int direction = (this.color == Couleur.BLACK) ? 1 : -1;
+                        
+                        // La case de capture est diagonale devant le pion ennemi
+                        int captureRow = currentRow + direction;
+                        int captureCol = adjacentCol;
+                        
+                        // Vérifier que la case de capture est valide
+                        if (captureRow >= 0 && captureRow < 8) {
+                            possibleMoves.add(new Case(captureRow, captureCol));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Override
